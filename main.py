@@ -3,7 +3,6 @@ import requests
 from dotenv import load_dotenv
 
 def send_slack_reminder():
-
     load_dotenv()
     slack_webhook_url = os.environ.get("SLACK_WEBHOOK_URL")
     if not slack_webhook_url:
