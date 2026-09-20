@@ -91,28 +91,6 @@ V1 주요 시나리오 검증
 
 최종 결과: PASS
 
-## Troubleshooting
-
-### 현상
-
-* launchd 예약 시간 도달 후 Slack 메시지 미전송
-* 초기 확인 시 실행 및 오류 로그 미생성
-
-### 원인 분석
-
-* `launchctl` 실행 상태 확인
-* `EX_CONFIG (78)` 확인
-* 실제 등록된 `ProgramArguments` 점검
-* Python 실행 파일과 `main.py` 경로의 잘못된 구성 확인
-
-### 해결
-
-* Python 실행 파일과 실행 대상 스크립트 경로 분리
-* plist 수정 후 문법 및 실제 등록 설정 재확인
-* launchd 수동 실행을 통한 정상 동작 확인
-* 예약 실행 E2E 재테스트
-* Slack 메시지 정상 수신 및 exit code `0` 확인
-
 ## Future Improvements
 
 * 공개 가능한 `.env.example` 및 launchd plist example 제공
