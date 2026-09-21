@@ -3,3 +3,4 @@
 reminder.log
 reminder-error.log
 com.qa.reminder.plist
+__pycache__/
