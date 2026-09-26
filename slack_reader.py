@@ -107,7 +107,14 @@ def has_end_comment(thread_messages, end_keyword):
 
 
 def check_qa_end_comment():
-    ticket_keys = ["CHAE-0001", "CHAE-0002", "CHAE-0003"]
+    load_dotenv()
+    ticket_keys_text = os.environ.get("QA_TICKET_KEYS", "")
+    ticket_keys = [key.strip() for key in ticket_keys_text.split(",") if key.strip()]
+
+    if not ticket_keys:
+        print("검사할 QA 티켓이 없습니다. 알림을 보내지 않습니다.")
+        return
+
     end_keyword = "테스트 종료"
 
     missing_tickets = []
