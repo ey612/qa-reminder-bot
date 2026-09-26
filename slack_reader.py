@@ -71,9 +71,7 @@ def find_parent_ts(channel_history, target_keyword):
         if target_keyword in text:
             return message.get("ts")
 
-    raise ValueError(
-        f"'{target_keyword}' 키워드가 포함된 메시지를 찾을 수 없습니다."
-    )
+    return None
 
 
 def get_thread_messages(channel_id, parent_ts):
@@ -107,20 +105,29 @@ def has_end_comment(thread_messages, end_keyword):
 
 
 def check_qa_end_comment():
-    target_keyword = "CHAE-0001"
+    ticket_keys = ["CHAE-0001", "CHAE-0002", "CHAE-0003"]
     end_keyword = "테스트 종료"
+
+    missing_tickets = []
+    not_found_tickets = []
 
     channel_id = get_channel_id()
     channel_history = get_channel_history(channel_id)
-    parent_ts = find_parent_ts(channel_history, target_keyword)
-    thread_messages = get_thread_messages(channel_id, parent_ts)
 
-    if has_end_comment(thread_messages, end_keyword):
-        print("QA 테스트 종료 댓글을 찾았습니다.")
-    else:
-        print("QA 테스트 종료 댓글을 찾지 못했습니다.")
-        send_slack_reminder()
+    for ticket_key in ticket_keys:
+        parent_ts = find_parent_ts(channel_history, ticket_key)
 
+        if not parent_ts:
+            not_found_tickets.append(ticket_key)
+            continue
+
+        thread_messages = get_thread_messages(channel_id, parent_ts)
+
+        if not has_end_comment(thread_messages, end_keyword):
+            missing_tickets.append(ticket_key)
+
+    print(f"종료 댓글이 없는 티켓: {missing_tickets}")
+    print(f"스레드를 찾지 못한 티켓: {not_found_tickets}")
 
 
 if __name__ == "__main__":
