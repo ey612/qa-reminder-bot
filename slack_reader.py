@@ -1,7 +1,6 @@
 import os
 import requests
 from dotenv import load_dotenv
-from main import send_slack_reminder
 
 def get_slack_bot_token():
     load_dotenv()
@@ -63,10 +62,13 @@ def get_channel_history(channel_id):
         )
     return data.get("messages", [])
 
-
 def find_parent_ts(channel_history, target_keyword):
     for message in channel_history:
         text = message.get("text", "")
+
+        # 봇이 보낸 QA 종료 상태 알림은 Parent 검색에서 제외
+        if text.startswith("QA 종료 상태 확인 결과"):
+            continue
 
         if target_keyword in text:
             return message.get("ts")
@@ -126,9 +128,22 @@ def check_qa_end_comment():
         if not has_end_comment(thread_messages, end_keyword):
             missing_tickets.append(ticket_key)
 
-    print(f"종료 댓글이 없는 티켓: {missing_tickets}")
-    print(f"스레드를 찾지 못한 티켓: {not_found_tickets}")
+        # 두 목록이 모두 비어 있으면 알림을 보내지 않음
+    if not missing_tickets and not not_found_tickets:
+        print("모든 티켓의 QA 종료 상태 확인 완료. 알림을 보내지 않습니다.")
+        return
 
+    message_lines = ["QA 종료 상태 확인 결과"]
 
-if __name__ == "__main__":
-    check_qa_end_comment()
+    if missing_tickets:
+        message_lines.append(
+            f"종료 댓글이 없는 티켓: {', '.join(missing_tickets)}"
+        )
+
+    if not_found_tickets:
+        message_lines.append(
+            f"Parent를 찾지 못한 티켓: {', '.join(not_found_tickets)}"
+        )
+
+    message_text = "\n".join(message_lines)
+    return message_text
