@@ -1,6 +1,8 @@
 import os
+import re
 import requests
 from dotenv import load_dotenv
+
 
 def get_slack_bot_token():
     load_dotenv()
@@ -67,7 +69,7 @@ def find_parent_ts(channel_history, target_keyword):
         text = message.get("text", "")
 
         # 봇이 보낸 QA 종료 상태 알림은 Parent 검색에서 제외
-        if text.startswith("QA 종료 상태 확인 결과"):
+        if text.startswith("종료 코멘트가 없는 티켓이 있습니다."):
             continue
 
         if target_keyword in text:
@@ -96,26 +98,33 @@ def get_thread_messages(channel_id, parent_ts):
     return data.get("messages", [])
 
 
-def has_end_comment(thread_messages, end_keyword):
+END_PATTERNS = {
+    "QA": r"QA.*종료",
+    "STG": r"STG.*종료",
+    "RELEASE": r"운영\s*모니터링.*종료",
+}
+
+
+def has_end_comment(thread_messages, stage, parent_ts):
+    pattern = END_PATTERNS[stage]
+
     for message in thread_messages:
+        # Parent 메시지는 종료 코멘트 검사에서 제외
+        if message.get("ts") == parent_ts:
+            continue
+
         text = message.get("text", "")
 
-        if end_keyword in text:
+        if re.search(pattern, text, re.IGNORECASE):
             return True
 
     return False
 
 
-def check_qa_end_comment():
-    load_dotenv()
-    ticket_keys_text = os.environ.get("QA_TICKET_KEYS", "")
-    ticket_keys = [key.strip() for key in ticket_keys_text.split(",") if key.strip()]
-
-    if not ticket_keys:
-        print("검사할 QA 티켓이 없습니다. 알림을 보내지 않습니다.")
-        return
-
-    end_keyword = "테스트 종료"
+def check_qa_end_comment(jira_issues):
+    if not jira_issues:
+        print("오늘 종료 확인 대상 티켓이 없습니다.")
+        return None
 
     missing_tickets = []
     not_found_tickets = []
@@ -123,24 +132,28 @@ def check_qa_end_comment():
     channel_id = get_channel_id()
     channel_history = get_channel_history(channel_id)
 
-    for ticket_key in ticket_keys:
+    for issue in jira_issues:
+        ticket_key = issue["issue_key"]
+        stage = issue["stage"]
+
         parent_ts = find_parent_ts(channel_history, ticket_key)
 
         if not parent_ts:
-            not_found_tickets.append(ticket_key)
+            not_found_tickets.append(f"{ticket_key} ({stage})")
             continue
 
         thread_messages = get_thread_messages(channel_id, parent_ts)
 
-        if not has_end_comment(thread_messages, end_keyword):
-            missing_tickets.append(ticket_key)
+        # print(f"[DEBUG] {ticket_key} / {stage} / Thread:", thread_messages)
 
-        # 두 목록이 모두 비어 있으면 알림을 보내지 않음
+        if not has_end_comment(thread_messages, stage, parent_ts):
+            missing_tickets.append(f"{ticket_key} ({stage})")
+
     if not missing_tickets and not not_found_tickets:
-        print("모든 티켓의 QA 종료 상태 확인 완료. 알림을 보내지 않습니다.")
-        return
+        print("모든 티켓의 종료 코멘트 확인 완료. 알림을 보내지 않습니다.")
+        return None
 
-    message_lines = ["QA 종료 상태 확인 결과"]
+    message_lines = ["종료 코멘트가 없는 티켓이 있습니다. 확인 후 종료 코멘트를 남겨주세요."]
 
     if missing_tickets:
         message_lines.append(
@@ -152,5 +165,25 @@ def check_qa_end_comment():
             f"Parent를 찾지 못한 티켓: {', '.join(not_found_tickets)}"
         )
 
-    message_text = "\n".join(message_lines)
-    return message_text
+    return "\n".join(message_lines)
+
+
+if __name__ == "__main__":
+    test_cases = [
+        ("QA 종료", "QA", True),
+        ("QA종료", "QA", True),
+        ("QA 테스트 종료", "QA", True),
+        ("STG5 서버 종료", "STG", True),
+        ("stg 종료", "STG", True),
+        ("운영모니터링 종료", "RELEASE", True),
+        ("운영 모니터링 종료", "RELEASE", True),
+        ("QA 종료", "STG", False),
+        ("STG 테스트 진행 중", "STG", False),
+    ]
+
+    for text, stage, expected in test_cases:
+        thread_messages = [{"text": text}]
+        actual = has_end_comment(thread_messages, stage)
+
+        result = "PASS" if actual == expected else "FAIL"
+        print(f"[{result}] {stage} | {text} | 결과: {actual}")
