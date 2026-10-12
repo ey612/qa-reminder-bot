@@ -68,11 +68,17 @@ def find_parent_ts(channel_history, target_keyword):
     for message in channel_history:
         text = message.get("text", "")
 
-        # 봇이 보낸 QA 종료 상태 알림은 Parent 검색에서 제외
-        if text.startswith("종료 코멘트가 없는 티켓이 있습니다."):
+        # 봇이 전송한 리마인드/상태 확인 메시지는 Parent 후보에서 제외
+        if "종료 댓글이 없는 티켓:" in text:
             continue
 
-        if target_keyword in text:
+        if "종료 코멘트가 없는 티켓이 있습니다." in text:
+            continue
+
+        # 티켓 키를 독립된 값으로 매칭 (QAW-5와 QAW-50 구분)
+        pattern = rf"(?<![A-Za-z0-9-]){re.escape(target_keyword)}(?![A-Za-z0-9-])"
+
+        if re.search(pattern, text):
             return message.get("ts")
 
     return None
@@ -99,9 +105,9 @@ def get_thread_messages(channel_id, parent_ts):
 
 
 END_PATTERNS = {
-    "QA": r"QA.*종료",
-    "STG": r"STG.*종료",
-    "RELEASE": r"운영\s*모니터링.*종료",
+    "QA": r"QA.*종료(?!\s*(?:예정|불가))",
+    "STG": r"STG.*종료(?!\s*(?:예정|불가))",
+    "RELEASE": r"운영\s*모니터링.*종료(?!\s*(?:예정|불가))",
 }
 
 
@@ -143,8 +149,6 @@ def check_qa_end_comment(jira_issues):
             continue
 
         thread_messages = get_thread_messages(channel_id, parent_ts)
-
-        # print(f"[DEBUG] {ticket_key} / {stage} / Thread:", thread_messages)
 
         if not has_end_comment(thread_messages, stage, parent_ts):
             missing_tickets.append(f"{ticket_key} ({stage})")
