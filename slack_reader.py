@@ -166,7 +166,7 @@ def check_qa_end_comment(jira_issues):
 
     if not_found_tickets:
         message_lines.append(
-            f"Parent를 찾지 못한 티켓: {', '.join(not_found_tickets)}"
+            f"스레드를 찾지 못한 티켓: {', '.join(not_found_tickets)}"
         )
 
     return "\n".join(message_lines)

@@ -4,9 +4,6 @@ name: QA Reminder Bot V2
 on:
   workflow_dispatch:
 
-  schedule:
-    - cron: "45 8 * * *"
-
 jobs:
   reminder:
     runs-on: ubuntu-latest
